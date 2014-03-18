@@ -43,13 +43,13 @@ char *lma_asprintf(struct lma *lma, const char *fmt, ...) {
 
 	va_start(va, fmt);
 	n = vsnprintf(p, m, fmt, va);
-
-	if (n >= 0 && (size_t) n < m)
-		lma->brk += (n + 16) & ~15;
-	else
-		p = NULL;
-
 	va_end(va);
-	return p;
+
+	if (n >= 0 && (size_t) n < m) {
+		lma->brk += (n + 16) & ~15;
+		return p;
+	}
+
+	return NULL;
 }
 

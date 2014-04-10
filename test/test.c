@@ -22,7 +22,9 @@ int main(int argc, char *argv[]) {
 	assert(lma_used(&lma) == 0);
 
 	p = lma_asprintf(&lma, "hello world #%d", 1);
-	printf("<%s>\n", p);
+	printf("<%s>\n", (char *) p);
 	assert(lma_used(&lma) == 16);
+
+	return 0;
 }
 

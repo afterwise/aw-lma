@@ -25,10 +25,13 @@
 #define AW_LMA_H
 
 #include <stddef.h>
-#include <stdint.h>
+
+#if !_MSC_VER
+# include <stdint.h>
+#endif
 
 #if __GNUC__
-# define _lma_alwaysinline inline __attribute__((always_inline, nodebug))
+# define _lma_alwaysinline inline __attribute__((always_inline))
 #elif _MSC_VER
 # define _lma_alwaysinline __forceinline
 #endif
@@ -43,7 +46,7 @@ struct lma {
 	size_t size;
 };
 
-_lma_alwaysinline void lma_init(struct lma *lma, void *base, size_t size) {
+static _lma_alwaysinline void lma_init(struct lma *lma, void *base, size_t size) {
 	lma->base = (uintptr_t) base;
 	lma->brk = (uintptr_t) base;
 	lma->size = size;
@@ -52,19 +55,19 @@ _lma_alwaysinline void lma_init(struct lma *lma, void *base, size_t size) {
 void *lma_alloc(struct lma *lma, size_t size);
 char *lma_asprintf(struct lma *lma, const char *fmt, ...);
 
-_lma_alwaysinline void *lma_getbrk(struct lma *lma) {
+static _lma_alwaysinline void *lma_getbrk(struct lma *lma) {
 	return (void *) lma->brk;
 }
 
-_lma_alwaysinline void lma_setbrk(struct lma *lma, void *brk) {
+static _lma_alwaysinline void lma_setbrk(struct lma *lma, void *brk) {
 	lma->brk = (uintptr_t) brk;
 }
 
-_lma_alwaysinline void lma_reset(struct lma *lma) {
+static _lma_alwaysinline void lma_reset(struct lma *lma) {
 	lma->brk = lma->base;
 }
 
-_lma_alwaysinline size_t lma_used(struct lma *lma) {
+static _lma_alwaysinline size_t lma_used(struct lma *lma) {
 	return lma->brk - lma->base;
 }
 

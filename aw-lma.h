@@ -32,8 +32,10 @@
 
 #if __GNUC__
 # define _lma_alwaysinline inline __attribute__((always_inline))
+# define _lma_format(a,b) __attribute__((format(__printf__,a,b)))
 #elif _MSC_VER
 # define _lma_alwaysinline __forceinline
+# define _lma_format(a,b)
 #endif
 
 #ifdef __cplusplus
@@ -53,7 +55,7 @@ static _lma_alwaysinline void lma_init(struct lma *lma, void *base, size_t size)
 }
 
 void *lma_alloc(struct lma *lma, size_t size);
-char *lma_asprintf(struct lma *lma, const char *fmt, ...);
+char *lma_asprintf(struct lma *lma, const char *fmt, ...) _lma_format(2, 3);
 
 static _lma_alwaysinline void *lma_getbrk(struct lma *lma) {
 	return (void *) lma->brk;

@@ -1,5 +1,4 @@
 
-#define _need_lma_asprintf
 #include "aw-lma.h"
 #include <assert.h>
 #include <stdlib.h>

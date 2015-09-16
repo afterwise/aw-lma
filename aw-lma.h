@@ -35,10 +35,12 @@
 # define _lma_alwaysinline inline __attribute__((always_inline))
 # define _lma_format(a,b) __attribute__((format(__printf__,a,b)))
 # define _lma_malloc __attribute__((malloc, warn_unused_result))
+# define _lma_unused __attribute__((__unused__))
 #elif _MSC_VER
 # define _lma_alwaysinline __forceinline
 # define _lma_format(a,b)
 # define _lma_malloc
+# define _lma_unused
 #endif
 
 #ifdef __cplusplus
@@ -73,14 +75,14 @@ static _lma_alwaysinline size_t lma_used(struct lma *lma) {
 	return lma->brk - lma->base;
 }
 
-static _lma_alwaysinline _lma_malloc void *lma_alloc(struct lma *lma, size_t size) {
+static void *lma_alloc(struct lma *lma, size_t size) _lma_unused _lma_malloc;
+static void *lma_alloc(struct lma *lma, size_t size) {
 	uintptr_t brk = lma->brk;
 	lma->brk += (size + 15) & ~15;
 	return (lma->base + lma->size >= brk + size) ? (void *) brk : NULL;
 }
 
-#ifdef _need_lma_asprintf
-static char *lma_asprintf(struct lma *lma, const char *fmt, ...) _lma_format(2, 3) _lma_malloc;
+static char *lma_asprintf(struct lma *lma, const char *fmt, ...) _lma_unused _lma_malloc _lma_format(2, 3);
 static char *lma_asprintf(struct lma *lma, const char *fmt, ...) {
 	va_list va;
 	char *p = lma_getbrk(lma);
@@ -98,7 +100,6 @@ static char *lma_asprintf(struct lma *lma, const char *fmt, ...) {
 
 	return NULL;
 }
-#endif
 
 #ifdef __cplusplus
 } /* extern "C" */

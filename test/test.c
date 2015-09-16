@@ -1,8 +1,8 @@
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
+#define _need_lma_asprintf
 #include "aw-lma.h"
+#include <assert.h>
+#include <stdlib.h>
 
 int main(int argc, char *argv[]) {
 	struct lma lma;

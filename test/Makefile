@@ -1,14 +1,11 @@
 
 export CFLAGS += -Wall -Wextra
 
-test: test.o ../libaw-lma.a
+test: test.o
 	$(CC) $(LDFLAGS) -o $@ $^
 
 %.o: %.c
 	$(CC) $(CFLAGS) -I.. -c $< -o $@
-
-../libaw-lma.a:
-	$(MAKE) -C..
 
 .PHONY: clean
 clean:

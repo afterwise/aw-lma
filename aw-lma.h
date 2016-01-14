@@ -80,21 +80,14 @@ _lma_alwaysinline size_t lma_inuse_high(struct lma *lma) { return lma->end - lma
 
 _lma_malloc _lma_alwaysinline
 void *lma_alloc_low(struct lma *lma, size_t size) {
-	lma_addr_t low = lma->low + ((size + 15) & ~15);
-	return (lma->high >= low) ? lma->low = low : NULL;
+	lma_addr_t low = lma->low, nxt = lma->low + ((size + 15) & ~15);
+	return (lma->high >= nxt) ? lma->low = nxt, low : NULL;
 }
 
 _lma_malloc _lma_alwaysinline
 void *lma_alloc_high(struct lma *lma, size_t size) {
 	lma_addr_t high = lma->high - ((size + 15) & ~15);
 	return (lma->low <= high) ? lma->high = high : NULL;
-}
-
-_lma_alwaysinline
-void lma_grow_low(struct lma *lma, size_t size) {
-	_lma_assert((size & 15) == 0);
-	_lma_assert(lma->high == lma->end);
-	lma->end = lma->high += size;
 }
 
 _lma_unused _lma_format(3, 4)

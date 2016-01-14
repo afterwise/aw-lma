@@ -12,17 +12,20 @@ int main(int argc, char *argv[]) {
 
 	p = malloc(1024);
 	lma_init(&lma, p, 1024);
-	assert(lma_used(&lma) == 0);
+	assert(lma_inuse_low(&lma) == 0);
+	assert(lma_inuse_high(&lma) == 0);
 
-	p = lma_alloc(&lma, 1);
-	assert(lma_used(&lma) == 16);
+	p = lma_alloc_high(&lma, 1);
+	assert(lma_inuse_low(&lma) == 0);
+	assert(lma_inuse_high(&lma) == 16);
 
-	lma_reset(&lma);
-	assert(lma_used(&lma) == 0);
+	lma_reset_high(&lma);
+	assert(lma_inuse_low(&lma) == 0);
+	assert(lma_inuse_high(&lma) == 0);
 
-	p = lma_asprintf(&lma, "hello world #%d", 1);
-	printf("<%s>\n", (char *) p);
-	assert(lma_used(&lma) == 16);
+	lma_asprintf_low(&lma, (char **) &p, "hello world #%d", 1);
+	printf("lma: <%s>\n", (char *) p);
+	assert(lma_inuse_low(&lma) == 16);
 
 	return 0;
 }

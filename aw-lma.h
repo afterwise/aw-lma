@@ -1,6 +1,6 @@
 
 /*
-   Copyright (c) 2014 Malte Hildingsson, malte (at) afterwi.se
+   Copyright (c) 2014-2016 Malte Hildingsson, malte (at) afterwi.se
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -24,11 +24,16 @@
 #ifndef AW_LMA_H
 #define AW_LMA_H
 
+#if !_MSC_VER || _MSC_VER >= 1600
+# include <stdint.h>
+#endif
+
 #include <stdarg.h>
 #include <stdio.h>
 
-#if !_MSC_VER
-# include <stdint.h>
+#ifndef _lma_assert
+# include <assert.h>
+# define _lma_assert(x) assert(x)
 #endif
 
 #if __GNUC__
@@ -47,58 +52,65 @@
 extern "C" {
 #endif
 
+/* Bi-directional linear memory allocator */
+
+typedef char *lma_addr_t;
+
 struct lma {
-	uintptr_t base;
-	uintptr_t brk;
-	size_t size;
+	lma_addr_t base;
+	lma_addr_t end;
+	lma_addr_t low;
+	lma_addr_t high;
 };
 
-static _lma_alwaysinline void lma_init(struct lma *lma, void *base, size_t size) {
-	lma->base = (uintptr_t) base;
-	lma->brk = (uintptr_t) base;
-	lma->size = size;
+_lma_alwaysinline
+void lma_init(struct lma *lma, void *base, size_t size) {
+	_lma_assert(((uintptr_t) base & 15) == 0);
+	_lma_assert((size & 15) == 0);
+	lma->base = lma->low = (lma_addr_t) base;
+	lma->end = lma->high = (lma_addr_t) base + size;
 }
 
-static _lma_alwaysinline void *lma_getbrk(struct lma *lma) {
-	return (void *) lma->brk;
+_lma_alwaysinline void lma_reset_low(struct lma *lma) { lma->low = lma->base; }
+_lma_alwaysinline void lma_reset_high(struct lma *lma) { lma->high = lma->end; }
+
+_lma_alwaysinline size_t lma_avail(struct lma *lma) { return lma->high - lma->low; }
+_lma_alwaysinline size_t lma_inuse_low(struct lma *lma) { return lma->low - lma->base; }
+_lma_alwaysinline size_t lma_inuse_high(struct lma *lma) { return lma->end - lma->high; }
+
+_lma_malloc _lma_alwaysinline
+void *lma_alloc_low(struct lma *lma, size_t size) {
+	lma_addr_t low = lma->low + ((size + 15) & ~15);
+	return (lma->high >= low) ? lma->low = low : NULL;
 }
 
-static _lma_alwaysinline void lma_setbrk(struct lma *lma, void *brk) {
-	lma->brk = (uintptr_t) brk;
+_lma_malloc _lma_alwaysinline
+void *lma_alloc_high(struct lma *lma, size_t size) {
+	lma_addr_t high = lma->high - ((size + 15) & ~15);
+	return (lma->low <= high) ? lma->high = high : NULL;
 }
 
-static _lma_alwaysinline void lma_reset(struct lma *lma) {
-	lma->brk = lma->base;
+_lma_alwaysinline
+void lma_grow_low(struct lma *lma, size_t size) {
+	_lma_assert((size & 15) == 0);
+	_lma_assert(lma->high == lma->end);
+	lma->end = lma->high += size;
 }
 
-static _lma_alwaysinline size_t lma_used(struct lma *lma) {
-	return lma->brk - lma->base;
-}
-
-static void *lma_alloc(struct lma *lma, size_t size) _lma_unused _lma_malloc;
-static void *lma_alloc(struct lma *lma, size_t size) {
-	uintptr_t brk = lma->brk;
-	lma->brk += (size + 15) & ~15;
-	return (lma->base + lma->size >= brk + size) ? (void *) brk : NULL;
-}
-
-static char *lma_asprintf(struct lma *lma, const char *fmt, ...) _lma_unused _lma_malloc _lma_format(2, 3);
-static char *lma_asprintf(struct lma *lma, const char *fmt, ...) {
+_lma_unused _lma_format(3, 4)
+static int lma_asprintf_low(struct lma *lma, char **ret, const char *fmt, ...) {
+	lma_addr_t low = lma->low;
+	size_t size = lma_avail(lma);
 	va_list va;
-	char *p = lma_getbrk(lma);
-	size_t m = lma->size - lma_used(lma);
-	int n;
-
 	va_start(va, fmt);
-	n = vsnprintf(p, m, fmt, va);
+	int n = vsnprintf(low, size, fmt, va);
 	va_end(va);
-
-	if (n >= 0 && (size_t) n < m) {
-		lma->brk += (n + 16) & ~15;
-		return p;
-	}
-
-	return NULL;
+	if (n >= 0 && (size_t) n < size) {
+		lma->low = low + ((n + 16) & ~15);
+		*ret = low;
+	} else
+		*ret = NULL;
+	return n;
 }
 
 #ifdef __cplusplus

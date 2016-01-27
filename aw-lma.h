@@ -89,9 +89,6 @@ _lma_alwaysinline void lma_reset_high(struct lma *lma) { lma->ends[LMA_HIGH] = l
 _lma_alwaysinline size_t lma_avail(const struct lma *lma) { return lma->ends[LMA_HIGH] - lma->ends[LMA_LOW]; }
 _lma_alwaysinline size_t lma_inuse_low(const struct lma *lma) { return lma->ends[LMA_LOW] - lma->base; }
 _lma_alwaysinline size_t lma_inuse_high(const struct lma *lma) { return lma->end - lma->ends[LMA_HIGH]; }
-_lma_alwaysinline size_t lma_inuse(const struct lma *lma, int area) {
-	return (area == LMA_LOW ? lma_inuse_low(lma) : lma_inuse_high(lma));
-}
 
 _lma_malloc _lma_alwaysinline
 void *lma_alloc_low(struct lma *lma, size_t size) {
@@ -103,11 +100,6 @@ _lma_malloc _lma_alwaysinline
 void *lma_alloc_high(struct lma *lma, size_t size) {
 	lma_addr_t high = lma->ends[LMA_HIGH] - ((size + 15) & ~15);
 	return (lma->ends[LMA_LOW] <= high) ? lma->ends[LMA_HIGH] = high : NULL;
-}
-
-_lma_malloc _lma_alwaysinline
-void *lma_alloc(struct lma *lma, int area, size_t size) {
-	return (area == LMA_LOW ? lma_alloc_low(lma, size) : lma_alloc_high(lma, size));
 }
 
 _lma_unused _lma_format(3, 4)
@@ -127,14 +119,14 @@ static int lma_asprintf_low(struct lma *lma, char **ret, const char *fmt, ...) {
 }
 
 /*
-   Utility for scoping temporary allocations, this allows ping-ponging of
-   temporary allocations between the high and low areas in nested call sites.
+   Utilities for scoping temporary allocations, allowing ping-ponging of
+   temporary allocations between the high and low areas for nested call sites.
 
 	void foo(struct lma_scope *ls) {
 		const struct lma_scope ll = lma_push(ls);
-		void *tmp = lma_alloc(ll.lma, ll.area, ...);
+		void *tmp = lma_alloc(ll, ...);
 		...
-		lma_pop(ll);
+		lma_pop(&ll);
 	}
  */
 
@@ -144,12 +136,20 @@ struct lma_scope {
 	int area;
 };
 
-_lma_alwaysinline struct lma_scope lma_push(struct lma_scope *ls) {
-	return (struct lma_scope) {ls->lma, ls->lma->ends[ls->area ^ LMA_HIGH], ls->area ^ LMA_HIGH};
+_lma_alwaysinline struct lma_scope lma_scope(struct lma *lma, int area) {
+	return (struct lma_scope) {lma, lma->ends[area], area};
 }
-
-_lma_alwaysinline void lma_pop(struct lma_scope ls) {
-	ls.lma->ends[ls.area] = ls.end;
+_lma_alwaysinline struct lma_scope lma_push(const struct lma_scope *ls) {
+	return lma_scope(ls->lma, ls->area ^ LMA_HIGH);
+}
+_lma_alwaysinline void lma_pop(const struct lma_scope *ls) {
+	ls->lma->ends[ls->area] = ls->end;
+}
+_lma_alwaysinline size_t lma_inuse(const struct lma_scope *ls) {
+	return (ls->area == LMA_LOW ? lma_inuse_low(ls->lma) : lma_inuse_high(ls->lma));
+}
+_lma_malloc _lma_alwaysinline void *lma_alloc(const struct lma_scope *ls, size_t size) {
+	return (ls->area == LMA_LOW ? lma_alloc_low(ls->lma, size) : lma_alloc_high(ls->lma, size));
 }
 
 /*

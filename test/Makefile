@@ -1,5 +1,5 @@
 
-export CFLAGS += -std=c99 -D_DEFAULT_SOURCE -Wall -Wextra
+export CFLAGS += -std=c99 -Wall -Wextra
 
 test: test.o
 	$(CC) $(LDFLAGS) -o $@ $^

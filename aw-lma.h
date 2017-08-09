@@ -91,15 +91,25 @@ _lma_alwaysinline size_t lma_inuse_low(const struct lma *lma) { return lma->ends
 _lma_alwaysinline size_t lma_inuse_high(const struct lma *lma) { return lma->end - lma->ends[LMA_HIGH]; }
 
 _lma_malloc _lma_alwaysinline
-void *lma_alloc_low(struct lma *lma, size_t size) {
-	lma_addr_t low = lma->ends[LMA_LOW], nxt = lma->ends[LMA_LOW] + ((size + 15) & ~15);
+void *lma_alloc_low_aligned(struct lma *lma, size_t size, size_t align) {
+	lma_addr_t low = lma->ends[LMA_LOW], nxt = lma->ends[LMA_LOW] + ((size + (align - 1)) & ~(align - 1));
 	return (lma->ends[LMA_HIGH] >= nxt) ? lma->ends[LMA_LOW] = nxt, low : NULL;
 }
 
 _lma_malloc _lma_alwaysinline
-void *lma_alloc_high(struct lma *lma, size_t size) {
-	lma_addr_t high = lma->ends[LMA_HIGH] - ((size + 15) & ~15);
+void *lma_alloc_low(struct lma *lma, size_t size) {
+	return lma_alloc_low_aligned(lma, size, 16);
+}
+
+_lma_malloc _lma_alwaysinline
+void *lma_alloc_high_aligned(struct lma *lma, size_t size, size_t align) {
+	lma_addr_t high = lma->ends[LMA_HIGH] - ((size + (align - 1)) & ~(align - 1));
 	return (lma->ends[LMA_LOW] <= high) ? lma->ends[LMA_HIGH] = high : NULL;
+}
+
+_lma_malloc _lma_alwaysinline
+void *lma_alloc_high(struct lma *lma, size_t size) {
+	return lma_alloc_high_aligned(lma, size, 16);
 }
 
 _lma_unused _lma_format(3, 4)
@@ -166,30 +176,30 @@ _lma_malloc _lma_alwaysinline void *lma_alloc(const struct lma_scope *ls, size_t
 # endif
 # define lma_debug(lma,on) do { (lma)->debug = (on); } while (0)
 # define lma_reset_low(lma) \
-	(lma_reset_low(lma), (void) _lma_debug(NULL, lma, "reset", LMA_LOW, 0, __FILE__, __LINE__, __func__))
+	(lma_reset_low(lma), (void) _lma_debug(NULL, lma, "reset", LMA_LOW, 0, __FILE__, __LINE__))
 # define lma_reset_high(lma) \
-	(lma_reset_high(lma), (void) _lma_debug(NULL, lma, "reset", LMA_HIGH, 0, __FILE__, __LINE__, __func__))
+	(lma_reset_high(lma), (void) _lma_debug(NULL, lma, "reset", LMA_HIGH, 0, __FILE__, __LINE__))
 # define lma_alloc_high(lma,size) \
-	_lma_debug(lma_alloc_high(lma, size), lma, "alloc", LMA_HIGH, size, __FILE__, __LINE__, __func__)
+	_lma_debug(lma_alloc_high(lma, size), lma, "alloc", LMA_HIGH, size, __FILE__, __LINE__)
 # define lma_alloc_low(lma,size) \
-	_lma_debug(lma_alloc_low(lma, size), lma, "alloc", LMA_LOW, size, __FILE__, __LINE__, __func__)
+	_lma_debug(lma_alloc_low(lma, size), lma, "alloc", LMA_LOW, size, __FILE__, __LINE__)
 # define lma_alloc(lma,area,size) \
-	_lma_debug(lma_alloc(lma, area, size), lma, "alloc", area, size, __FILE__, __LINE__, __func__)
+	_lma_debug(lma_alloc(lma, area, size), lma, "alloc", area, size, __FILE__, __LINE__)
 # define lma_asprintf_low(lma,ret,fmt,...) \
 	_lma_debug_asprintf( \
 		lma_asprintf_low(lma, ret, fmt, __VA_ARGS__), *(ret), lma, "alloc", LMA_LOW, \
-		(*(ret) ? strlen(*(ret)) + 1 : 0), __FILE__, __LINE__, __func__)
+		(*(ret) ? strlen(*(ret)) + 1 : 0), __FILE__, __LINE__)
 _lma_alwaysinline void *_lma_debug(
 		void *p, struct lma *lma, const char *what, int area, size_t size,
-		const char *file, int line, const char *func) {
+		const char *file, int line) {
 	if (lma->debug)
 		_lma_debugf(
-# if _MSC_VER
-			"lma: %s:%d:%s: %14p-%14p:%08Ix %08Ix-%08Ix %04.01f%% %s %-4s %14p:%08Ix\n",
+# if _MSC_VER || __MINGW32__
+			"lma: %s:%d: %08p-%08p:%06Ix %06Ix-%06Ix %04.01f%% %s %-4s %08p:%06Ix\n",
 # else
-			"lma: %s:%d:%s: %14p-%14p:%08zx %08zx-%08zx %04.01f%% %s %-4s %14p:%08zx\n",
+			"lma: %s:%d: %08p-%08p:%06zx %06zx-%06zx %04.01f%% %s %-4s %08p:%06zx\n",
 # endif
-			file, line, func, lma->base, lma->end, lma->end - lma->base,
+			file, line, lma->base, lma->end, lma->end - lma->base,
 			lma_inuse_low(lma), lma_inuse_high(lma),
 			(double) ((lma->end - lma->base) - lma_avail(lma)) / (lma->end - lma->base) * 100.0,
 			what, area ? "high" : "low", p, size);
@@ -197,8 +207,8 @@ _lma_alwaysinline void *_lma_debug(
 }
 _lma_alwaysinline int _lma_debug_asprintf(
 		int err, void *p, struct lma *lma, const char *what, int area, size_t size,
-		const char *file, int line, const char *func) {
-	_lma_debug(p, lma, what, area, size, file, line, func);
+		const char *file, int line) {
+	_lma_debug(p, lma, what, area, size, file, line);
 	return err;
 }
 #endif

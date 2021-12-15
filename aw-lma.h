@@ -1,6 +1,6 @@
 
 /*
-   Copyright (c) 2014-2016 Malte Hildingsson, malte (at) afterwi.se
+   Copyright (c) 2014-2021 Malte Hildingsson, malte (at) afterwi.se
 
    Permission is hereby granted, free of charge, to any person obtaining a copy
    of this software and associated documentation files (the "Software"), to deal
@@ -147,7 +147,11 @@ struct lma_scope {
 };
 
 _lma_alwaysinline struct lma_scope lma_scope(struct lma *lma, int area) {
-	return (struct lma_scope) {lma, lma->ends[area], area};
+	struct lma_scope scope;
+	scope.lma = lma;
+	scope.end = lma->ends[area];
+	scope.area = area;
+	return scope;
 }
 _lma_alwaysinline struct lma_scope lma_push(const struct lma_scope *ls) {
 	return lma_scope(ls->lma, ls->area ^ LMA_HIGH);

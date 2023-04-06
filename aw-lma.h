@@ -25,28 +25,34 @@
 #ifndef AW_LMA_H
 #define AW_LMA_H
 
-#if !_MSC_VER || _MSC_VER >= 1600
+#if !defined(_MSC_VER) || _MSC_VER >= 1600
 # include <stdint.h>
 #endif
 
 #include <stdarg.h>
 #include <stdio.h>
 
-#ifndef _lma_assert
+#if !defined(_lma_assert)
 # include <assert.h>
 # define _lma_assert(x) assert(x)
 #endif
 
-#if __GNUC__
+#if defined(_HAS_CXX17)
+# define _lma_unused [[maybe_unused]]
+#elif defined(__GNUC__)
+# define _lma_unused __attribute__((unused))
+#elif defined(_MSC_VER)
+# define _lma_unused
+#endif
+
+#if defined(__GNUC__)
 # define _lma_alwaysinline inline __attribute__((always_inline))
 # define _lma_format(a,b) __attribute__((format(__printf__,a,b)))
 # define _lma_malloc __attribute__((malloc, warn_unused_result))
-# define _lma_unused __attribute__((__unused__))
-#elif _MSC_VER
+#elif defined(_MSC_VER)
 # define _lma_alwaysinline __forceinline
 # define _lma_format(a,b)
 # define _lma_malloc
-# define _lma_unused
 #endif
 
 #ifdef __cplusplus
@@ -199,7 +205,7 @@ _lma_alwaysinline void *_lma_debug(
 		const char *file, int line) {
 	if (lma->debug)
 		_lma_debugf(
-# if _MSC_VER || __MINGW32__
+# if defined(_MSC_VER) || defined(__MINGW32__)
 			"lma: %s:%d: %08p-%08p:%06Ix %06Ix-%06Ix %04.01f%% %s %-4s %08p:%06Ix\n",
 # else
 			"lma: %s:%d: %08p-%08p:%06zx %06zx-%06zx %04.01f%% %s %-4s %08p:%06zx\n",

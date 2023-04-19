@@ -135,6 +135,22 @@ static int lma_asprintf_low(struct lma *lma, char **ret, const char *fmt, ...) {
 	return n;
 }
 
+_lma_unused _lma_format(3, 4)
+static int lma_asprintf_low_aligned(struct lma *lma, char **ret, size_t align, const char *fmt, ...) {
+	lma_addr_t low = lma->brks[LMA_LOW];
+	size_t size = lma_avail(lma);
+	va_list va;
+	va_start(va, fmt);
+	int n = vsnprintf(low, size, fmt, va);
+	va_end(va);
+	if (n >= 0 && (size_t) n < size) {
+		lma->brks[LMA_LOW]= low + ((n + align) & ~(align - 1));
+		*ret = low;
+	} else
+		*ret = NULL;
+	return n;
+}
+
 /*
    Utilities for scoping temporary allocations, allowing ping-ponging of
    temporary allocations between the high and low areas for nested call sites.

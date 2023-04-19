@@ -73,7 +73,7 @@ typedef char *lma_addr_t;
 struct lma {
 	lma_addr_t base;
 	lma_addr_t end;
-	lma_addr_t ends[2];
+	lma_addr_t brks[2];
 #ifdef LMA_DEBUG
 	int debug;
 #endif
@@ -83,24 +83,24 @@ _lma_alwaysinline
 void lma_init(struct lma *lma, void *base, size_t size) {
 	_lma_assert(((uintptr_t) base & 15) == 0);
 	_lma_assert((size & 15) == 0);
-	lma->base = lma->ends[LMA_LOW] = (lma_addr_t) base;
-	lma->end = lma->ends[LMA_HIGH] = (lma_addr_t) base + size;
+	lma->base = lma->brks[LMA_LOW] = (lma_addr_t) base;
+	lma->end = lma->brks[LMA_HIGH] = (lma_addr_t) base + size;
 #ifdef LMA_DEBUG
 	lma->debug = 0;
 #endif
 }
 
-_lma_alwaysinline void lma_reset_low(struct lma *lma) { lma->ends[LMA_LOW] = lma->base; }
-_lma_alwaysinline void lma_reset_high(struct lma *lma) { lma->ends[LMA_HIGH] = lma->end; }
+_lma_alwaysinline void lma_reset_low(struct lma *lma) { lma->brks[LMA_LOW] = lma->base; }
+_lma_alwaysinline void lma_reset_high(struct lma *lma) { lma->brks[LMA_HIGH] = lma->end; }
 
-_lma_alwaysinline size_t lma_avail(const struct lma *lma) { return lma->ends[LMA_HIGH] - lma->ends[LMA_LOW]; }
-_lma_alwaysinline size_t lma_inuse_low(const struct lma *lma) { return lma->ends[LMA_LOW] - lma->base; }
-_lma_alwaysinline size_t lma_inuse_high(const struct lma *lma) { return lma->end - lma->ends[LMA_HIGH]; }
+_lma_alwaysinline size_t lma_avail(const struct lma *lma) { return lma->brks[LMA_HIGH] - lma->brks[LMA_LOW]; }
+_lma_alwaysinline size_t lma_inuse_low(const struct lma *lma) { return lma->brks[LMA_LOW] - lma->base; }
+_lma_alwaysinline size_t lma_inuse_high(const struct lma *lma) { return lma->end - lma->brks[LMA_HIGH]; }
 
 _lma_malloc _lma_alwaysinline
 void *lma_alloc_low_aligned(struct lma *lma, size_t size, size_t align) {
-	lma_addr_t low = lma->ends[LMA_LOW], nxt = lma->ends[LMA_LOW] + ((size + (align - 1)) & ~(align - 1));
-	return (lma->ends[LMA_HIGH] >= nxt) ? lma->ends[LMA_LOW] = nxt, low : NULL;
+	lma_addr_t low = lma->brks[LMA_LOW], nxt = lma->brks[LMA_LOW] + ((size + (align - 1)) & ~(align - 1));
+	return (lma->brks[LMA_HIGH] >= nxt) ? lma->brks[LMA_LOW] = nxt, low : NULL;
 }
 
 _lma_malloc _lma_alwaysinline
@@ -110,8 +110,8 @@ void *lma_alloc_low(struct lma *lma, size_t size) {
 
 _lma_malloc _lma_alwaysinline
 void *lma_alloc_high_aligned(struct lma *lma, size_t size, size_t align) {
-	lma_addr_t high = lma->ends[LMA_HIGH] - ((size + (align - 1)) & ~(align - 1));
-	return (lma->ends[LMA_LOW] <= high) ? lma->ends[LMA_HIGH] = high : NULL;
+	lma_addr_t high = lma->brks[LMA_HIGH] - ((size + (align - 1)) & ~(align - 1));
+	return (lma->brks[LMA_LOW] <= high) ? lma->brks[LMA_HIGH] = high : NULL;
 }
 
 _lma_malloc _lma_alwaysinline
@@ -121,14 +121,14 @@ void *lma_alloc_high(struct lma *lma, size_t size) {
 
 _lma_unused _lma_format(3, 4)
 static int lma_asprintf_low(struct lma *lma, char **ret, const char *fmt, ...) {
-	lma_addr_t low = lma->ends[LMA_LOW];
+	lma_addr_t low = lma->brks[LMA_LOW];
 	size_t size = lma_avail(lma);
 	va_list va;
 	va_start(va, fmt);
 	int n = vsnprintf(low, size, fmt, va);
 	va_end(va);
 	if (n >= 0 && (size_t) n < size) {
-		lma->ends[LMA_LOW]= low + ((n + 16) & ~15);
+		lma->brks[LMA_LOW]= low + ((n + 16) & ~15);
 		*ret = low;
 	} else
 		*ret = NULL;
@@ -156,7 +156,7 @@ struct lma_scope {
 _lma_alwaysinline struct lma_scope lma_scope(struct lma *lma, int area) {
 	struct lma_scope scope;
 	scope.lma = lma;
-	scope.end = lma->ends[area];
+	scope.end = lma->brks[area];
 	scope.area = area;
 	return scope;
 }
@@ -164,7 +164,7 @@ _lma_alwaysinline struct lma_scope lma_push(const struct lma_scope *ls) {
 	return lma_scope(ls->lma, ls->area ^ LMA_HIGH);
 }
 _lma_alwaysinline void lma_pop(const struct lma_scope *ls) {
-	ls->lma->ends[ls->area] = ls->end;
+	ls->lma->brks[ls->area] = ls->end;
 }
 _lma_alwaysinline size_t lma_inuse(const struct lma_scope *ls) {
 	return (ls->area == LMA_LOW ? lma_inuse_low(ls->lma) : lma_inuse_high(ls->lma));

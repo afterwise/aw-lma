@@ -135,7 +135,7 @@ static int lma_asprintf_low(struct lma *lma, char **ret, const char *fmt, ...) {
 	return n;
 }
 
-_lma_unused _lma_format(3, 4)
+_lma_unused _lma_format(4, 5)
 static int lma_asprintf_low_aligned(struct lma *lma, char **ret, size_t align, const char *fmt, ...) {
 	lma_addr_t low = lma->brks[LMA_LOW];
 	size_t size = lma_avail(lma);
